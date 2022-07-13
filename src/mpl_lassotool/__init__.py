@@ -33,6 +33,10 @@ class LassoTool:
         self._on_close = on_close
 
     @property
+    def ax(self):
+        return self._ax
+
+    @property
     def x(self):
         "X coordinates of the lasso polygon."
         return np.array([e.xdata for e in self._points])
@@ -76,6 +80,9 @@ class LassoTool:
         points = MultiPoint(list(zip(x, y)))
         return np.array([polygon.contains(p) for p in points.geoms])
 
+    def update(self):
+        self._fig.canvas.draw()
+
     @property
     def _is_opened(self):
         "Indicate if the lasso polygon is opened."
@@ -111,7 +118,7 @@ class LassoTool:
             line0, line1 = self._get_ends_to_cursor(event)
             self._ends_to_cursor[0].set_data(*line0)
             self._ends_to_cursor[1].set_data(*line1)
-            self._fig.canvas.draw()
+            self.update()
 
     def _on_release(self, event):
         "Mouse button release event."
@@ -152,7 +159,7 @@ class ExampleEventHandler:
         idx = lt.contains(self._x, self._y)
         self._markers.set_offsets(np.c_[self._x[idx], self._y[idx]])
         self._markers.set_visible(True)
-        lt._fig.canvas.draw()
+        lt.update()
         getLogger(lt.NAME).debug(f"{np.nonzero(idx)}")
 
 
