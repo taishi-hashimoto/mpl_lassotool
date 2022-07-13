@@ -7,7 +7,7 @@ from typing import Callable, Iterable
 
 
 class LassoTool:
-    "Lasso tool for matplotlib."
+    "Lasso selection tool for matplotlib."
 
     NAME = "mpl_lassotool"
 
@@ -156,7 +156,7 @@ class ExampleEventHandler:
         getLogger(lt.NAME).debug(f"{np.nonzero(idx)}")
 
 
-if __name__ == "__main__":
+def test():
     from logging.config import dictConfig
 
     dictConfig({
@@ -193,8 +193,9 @@ if __name__ == "__main__":
     data = np.random.normal(size=(2, 100))
     ax.scatter(*data)
     eh = ExampleEventHandler(*data)
-    lasso = LassoTool(fig, on_open=eh.on_open, on_close=eh.on_close)
-
+    _ = LassoTool(fig, on_open=eh.on_open, on_close=eh.on_close)
     plt.show()
 
-# %%
+
+if __name__ == "__main__":
+    test()
