@@ -1,9 +1,11 @@
+from collections import namedtuple
+from matplotlib.axes import Axes
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from logging import getLogger
 from shapely.geometry import Polygon, MultiPoint
-from typing import Callable, Iterable
+from typing import Callable, Dict, Iterable, Tuple
 
 
 class LassoTool:
@@ -14,13 +16,16 @@ class LassoTool:
     def __init__(
         self,
         fig: Figure,
+        eventhandler: 'EventHandler' = None,
         on_open: Callable[["LassoTool"], None] = None,
-        on_close: Callable[["LassoTool"], None] = None
+        on_close: Callable[["LassoTool"], None] = None,
+        modifiers=("control",),
     ) -> None:
         self._fig = fig
         self._ax = None
         self._line = None  # Lasso line.
         self._ends_to_cursor = None  # Closing lines.
+        self._is_opened = False
         self._points = []
         self._ls = ":"
         self._c = "k"
@@ -31,9 +36,16 @@ class LassoTool:
         self._fig.canvas.mpl_connect("button_press_event", self._on_press)
         self._fig.canvas.mpl_connect("motion_notify_event", self._on_move)
         self._fig.canvas.mpl_connect("button_release_event", self._on_release)
-        self._on_open = on_open
-        self._on_close = on_close
-        self._alt = False
+        if eventhandler is not None:
+            self._eventhandler = eventhandler
+        else:
+            self._eventhandler = namedtuple(
+                "EventHandler",
+                "on_open, on_close"
+            )(
+                on_open if on_open is not None else lambda x: None,
+                on_close if on_close is not None else lambda x: None)
+        self._modifiers = {key: False for key in modifiers}
 
     @property
     def ax(self):
@@ -54,21 +66,7 @@ class LassoTool:
         "The lasso polygon."
         return Polygon(zip(self.x, self.y))
 
-    def on_open(self):
-        "Fired when the lasso polygon is opened."
-        if self._on_open is not None:
-            self._on_open(self)
-        else:
-            getLogger(self.NAME).debug("Lasso tool started.")
-
-    def on_close(self):
-        "Fired when lasso polygon is closed."
-        if self._on_close is not None:
-            self._on_close(self)
-        else:
-            getLogger(self.NAME).debug(f"{self.polygon}")
-
-    def contains(self, x: np.ndarray, y: np.ndarray) -> Iterable[bool]:
+    def contains(self, x: Iterable, y: Iterable) -> Iterable[bool]:
         """Return boolean array that indicates if points (x, y) are contained
             in the lasso polygon.
 
@@ -87,30 +85,33 @@ class LassoTool:
         self._fig.canvas.draw()
 
     @property
-    def _is_opened(self):
-        "Indicate if the lasso polygon is opened."
-        return self._ends_to_cursor is not None
+    def _is_modifiers_pressed(self):
+        return all(self._modifiers.values())
 
     def _on_key_press(self, event):
-        getLogger(self.NAME).debug(event)
-        if "alt" in event.key:
-            self._alt = True
+        getLogger(self.NAME).debug(event.key)
+
+        for key in event.key.split("+"):
+            if key in self._modifiers:
+                self._modifiers[key] = True
 
     def _on_key_release(self, event):
         getLogger(self.NAME).debug(event)
-        if "alt" in event.key:
-            self._alt = False
+
+        for key in event.key.split("+"):
+            if key in self._modifiers:
+                self._modifiers[key] = False
 
     def _on_press(self, event):
         "Mouse button press event."
-        if event.button == 1 and self._alt:  # Left click, start the lasso.
+        if event.button == 1 and self._is_modifiers_pressed:
             # Start the new lasso.
             if self._line is not None:
                 self._ax.lines.remove(self._line)
             self._ax = event.inaxes
             self._points.clear()
             self._points.append(event)
-            self.on_open()
+            self._eventhandler.on_open(self)
             # New lasso started.
             self._line, = self._ax.plot(
                 event.xdata, event.ydata,
@@ -122,6 +123,7 @@ class LassoTool:
                 self._ax.plot(
                     *line1, c=self._c, ls=self._ls, lw=self._lw)[0],
             )
+            self._is_opened = True
 
     def _on_move(self, event):
         "Mouse button motion event."
@@ -140,11 +142,12 @@ class LassoTool:
             self._ax.lines.remove(self._ends_to_cursor[0])
             self._ax.lines.remove(self._ends_to_cursor[1])
             self._ends_to_cursor = None
+            self._is_opened = False
             self._line.set_data(
                 np.r_[self.x, self.x[0]],
                 np.r_[self.y, self.y[0]])
             if len(self._points) > 3:
-                self.on_close()
+                self._eventhandler.on_close(self)
 
     def _get_ends_to_cursor(self, event):
         return (
@@ -153,24 +156,25 @@ class LassoTool:
         )
 
 
-class ExampleEventHandler:
-    "An example implementation for event handler."
+class EventHandler:
+    "Basic event handler for figures with multiple axes."
 
-    def __init__(self, x, y):
-        self._x = x
-        self._y = y
-        self._markers = None
+    def __init__(self, xy: Dict[Axes, Tuple[Iterable, Iterable]]) -> None:
+        self._xy = xy
+        self._markers = {ax: None for ax in self._xy}
 
     def on_open(self, lt: LassoTool):
-        if self._markers is None:
-            self._markers = lt._ax.scatter([], [], marker="x", color="r")
+        if self._markers[lt.ax] is None:
+            self._markers[lt.ax] = lt._ax.scatter([], [], marker="x", color="r")
         else:
-            self._markers.set_visible(False)
+            self._markers[lt.ax].set_visible(False)
 
     def on_close(self, lt: LassoTool):
-        idx = lt.contains(self._x, self._y)
-        self._markers.set_offsets(np.c_[self._x[idx], self._y[idx]])
-        self._markers.set_visible(True)
+        idx = lt.contains(*self._xy[lt.ax])
+        for ax in self._markers:
+            x, y = self._xy[ax]
+            self._markers[ax].set_offsets(np.c_[x[idx], y[idx]])
+            self._markers[ax].set_visible(True)
         lt.update()
         getLogger(lt.NAME).debug(f"{np.nonzero(idx)}")
 
@@ -211,8 +215,7 @@ def test():
     # Some data.
     data = np.random.normal(size=(2, 100))
     ax.scatter(*data)
-    eh = ExampleEventHandler(*data)
-    _ = LassoTool(fig, on_open=eh.on_open, on_close=eh.on_close)
+    _ = LassoTool(fig, EventHandler({ax: data}))
     plt.show()
 
 
