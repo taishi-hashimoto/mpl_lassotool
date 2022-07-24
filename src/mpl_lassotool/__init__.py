@@ -26,11 +26,14 @@ class LassoTool:
         self._c = "k"
         self._lw = 1
         # Connect event handlers.
+        self._fig.canvas.mpl_connect("key_press_event", self._on_key_press)
+        self._fig.canvas.mpl_connect("key_release_event", self._on_key_release)
         self._fig.canvas.mpl_connect("button_press_event", self._on_press)
         self._fig.canvas.mpl_connect("motion_notify_event", self._on_move)
         self._fig.canvas.mpl_connect("button_release_event", self._on_release)
         self._on_open = on_open
         self._on_close = on_close
+        self._alt = False
 
     @property
     def ax(self):
@@ -88,9 +91,19 @@ class LassoTool:
         "Indicate if the lasso polygon is opened."
         return self._ends_to_cursor is not None
 
+    def _on_key_press(self, event):
+        getLogger(self.NAME).debug(event)
+        if "alt" in event.key:
+            self._alt = True
+
+    def _on_key_release(self, event):
+        getLogger(self.NAME).debug(event)
+        if "alt" in event.key:
+            self._alt = False
+
     def _on_press(self, event):
         "Mouse button press event."
-        if event.button == 1:  # Left click, start the lasso.
+        if event.button == 1 and self._alt:  # Left click, start the lasso.
             # Start the new lasso.
             if self._line is not None:
                 self._ax.lines.remove(self._line)
@@ -123,16 +136,15 @@ class LassoTool:
     def _on_release(self, event):
         "Mouse button release event."
         getLogger(self.NAME).debug(event)
-        if event.button == 1:
-            if self._is_opened:
-                self._ax.lines.remove(self._ends_to_cursor[0])
-                self._ax.lines.remove(self._ends_to_cursor[1])
-                self._ends_to_cursor = None
-                self._line.set_data(
-                    np.r_[self.x, self.x[0]],
-                    np.r_[self.y, self.y[0]])
-                if len(self._points) > 3:
-                    self.on_close()
+        if event.button == 1 and self._is_opened:
+            self._ax.lines.remove(self._ends_to_cursor[0])
+            self._ax.lines.remove(self._ends_to_cursor[1])
+            self._ends_to_cursor = None
+            self._line.set_data(
+                np.r_[self.x, self.x[0]],
+                np.r_[self.y, self.y[0]])
+            if len(self._points) > 3:
+                self.on_close()
 
     def _get_ends_to_cursor(self, event):
         return (
