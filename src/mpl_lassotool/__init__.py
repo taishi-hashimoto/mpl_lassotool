@@ -26,6 +26,7 @@ class LassoTool:
         self._line = None  # Lasso line.
         self._ends_to_cursor = None  # Closing lines.
         self._is_opened = False
+        self._background = None
         self._points = []
         self._ls = ":"
         self._c = "k"
@@ -109,20 +110,27 @@ class LassoTool:
             if self._line is not None:
                 self._ax.lines.remove(self._line)
             self._ax = event.inaxes
+            self._background = self._fig.canvas.copy_from_bbox(self._ax.bbox)
             self._points.clear()
             self._points.append(event)
             self._eventhandler.on_open(self)
             # New lasso started.
             self._line, = self._ax.plot(
                 event.xdata, event.ydata,
-                c=self._c, ls=self._ls, lw=self._lw)
+                c=self._c, ls=self._ls, lw=self._lw, animated=True)
             line0, line1 = self._get_ends_to_cursor(event)
             self._ends_to_cursor = (
                 self._ax.plot(
-                    *line0, c=self._c, ls=self._ls, lw=self._lw)[0],
+                    *line0,
+                    c=self._c, ls=self._ls, lw=self._lw, animated=True)[0],
                 self._ax.plot(
-                    *line1, c=self._c, ls=self._ls, lw=self._lw)[0],
+                    *line1,
+                    c=self._c, ls=self._ls, lw=self._lw, animated=True)[0],
             )
+            self._ax.draw_artist(self._line)
+            self._ax.draw_artist(self._ends_to_cursor[0])
+            self._ax.draw_artist(self._ends_to_cursor[1])
+            self._fig.canvas.blit(self._ax.bbox)
             self._is_opened = True
 
     def _on_move(self, event):
@@ -133,7 +141,12 @@ class LassoTool:
             line0, line1 = self._get_ends_to_cursor(event)
             self._ends_to_cursor[0].set_data(*line0)
             self._ends_to_cursor[1].set_data(*line1)
-            self.update()
+            # Redraw
+            self._fig.canvas.restore_region(self._background)
+            self._ax.draw_artist(self._line)
+            self._ax.draw_artist(self._ends_to_cursor[0])
+            self._ax.draw_artist(self._ends_to_cursor[1])
+            self._fig.canvas.blit(self._ax.bbox)
 
     def _on_release(self, event):
         "Mouse button release event."
@@ -148,6 +161,7 @@ class LassoTool:
                 np.r_[self.y, self.y[0]])
             if len(self._points) > 3:
                 self._eventhandler.on_close(self)
+            self._fig.canvas.draw()
 
     def _get_ends_to_cursor(self, event):
         return (
