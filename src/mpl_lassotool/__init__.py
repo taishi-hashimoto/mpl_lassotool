@@ -105,7 +105,11 @@ class LassoTool:
 
     def _on_press(self, event):
         "Mouse button press event."
-        if event.button == 1 and self._is_modifiers_pressed:
+        if (
+            event.inaxes is not None and
+            event.button == 1 and
+            self._is_modifiers_pressed
+        ):
             # Start the new lasso.
             if self._line is not None:
                 self._ax.lines.remove(self._line)
