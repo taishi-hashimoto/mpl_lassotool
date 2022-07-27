@@ -195,10 +195,10 @@ class EventHandler:
         self._marker = marker
         self._color = color
 
-    def on_open(self, lt: LassoTool) -> None:
+    def on_open(self, _: LassoTool) -> None:
         for ax in self._markers:
             if self._markers[ax] is None:
-                self._markers[ax] = lt._ax.scatter(
+                self._markers[ax] = ax.scatter(
                     [], [],
                     marker=self._marker, color=self._color)
             else:
