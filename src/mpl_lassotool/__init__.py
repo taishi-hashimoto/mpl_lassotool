@@ -196,12 +196,13 @@ class EventHandler:
         self._color = color
 
     def on_open(self, lt: LassoTool) -> None:
-        if self._markers[lt.ax] is None:
-            self._markers[lt.ax] = lt._ax.scatter(
-                [], [],
-                marker=self._marker, color=self._color)
-        else:
-            self._markers[lt.ax].set_visible(False)
+        for ax in self._markers:
+            if self._markers[ax] is None:
+                self._markers[ax] = lt._ax.scatter(
+                    [], [],
+                    marker=self._marker, color=self._color)
+            else:
+                self._markers[ax].set_visible(False)
 
     def on_close(self, lt: LassoTool) -> Iterable[bool]:
         """Called when lasso tool is closed.
