@@ -1,3 +1,4 @@
+"Lasso selection tool for matplotlib."
 from collections import namedtuple
 from matplotlib.axes import Axes
 import numpy as np
@@ -21,6 +22,7 @@ class LassoTool:
         on_close: Callable[["LassoTool"], None] = None,
         modifiers=("control",),
     ) -> None:
+        "Prepare the lasso tool and connect the event handlers."
         self._fig = fig
         self._ax = None
         self._line = None  # Lasso line.
@@ -45,11 +47,13 @@ class LassoTool:
                 "on_open, on_close"
             )(
                 on_open if on_open is not None else lambda x: None,
-                on_close if on_close is not None else lambda x: None)
+                on_close if on_close is not None else lambda x: None
+            )
         self._modifiers = {key: False for key in modifiers}
 
     @property
     def ax(self):
+        "The target axes on which the lasso tool is used."
         return self._ax
 
     @property
@@ -83,13 +87,16 @@ class LassoTool:
         return np.array([polygon.contains(p) for p in points.geoms])
 
     def update(self):
+        "Redraw the figure."
         self._fig.canvas.draw()
 
     @property
     def _is_modifiers_pressed(self):
+        "Indicate if all modifiers keys are pressed."
         return all(self._modifiers.values())
 
     def _on_key_press(self, event):
+        "Keyboard press event."
         getLogger(self.NAME).debug(event.key)
 
         for key in event.key.split("+"):
@@ -97,6 +104,7 @@ class LassoTool:
                 self._modifiers[key] = True
 
     def _on_key_release(self, event):
+        "Keyboard release event."
         getLogger(self.NAME).debug(event)
 
         for key in event.key.split("+"):
@@ -177,17 +185,29 @@ class LassoTool:
 class EventHandler:
     "Basic event handler for figures with multiple axes."
 
-    def __init__(self, xy: Dict[Axes, Tuple[Iterable, Iterable]]) -> None:
+    def __init__(
+        self, xy: Dict[Axes, Tuple[Iterable, Iterable]],
+        marker="x",
+        color="r"
+    ) -> None:
         self._xy = xy
         self._markers = {ax: None for ax in self._xy}
+        self._marker = marker
+        self._color = color
 
-    def on_open(self, lt: LassoTool):
+    def on_open(self, lt: LassoTool) -> None:
         if self._markers[lt.ax] is None:
-            self._markers[lt.ax] = lt._ax.scatter([], [], marker="x", color="r")
+            self._markers[lt.ax] = lt._ax.scatter(
+                [], [],
+                marker=self._marker, color=self._color)
         else:
             self._markers[lt.ax].set_visible(False)
 
-    def on_close(self, lt: LassoTool):
+    def on_close(self, lt: LassoTool) -> Iterable[bool]:
+        """Called when lasso tool is closed.
+
+        Returned:
+            An boolean array indicating the chosen indices."""
         idx = lt.contains(*self._xy[lt.ax])
         for ax in self._markers:
             x, y = self._xy[ax]
@@ -195,6 +215,7 @@ class EventHandler:
             self._markers[ax].set_visible(True)
         lt.update()
         getLogger(lt.NAME).debug(f"{np.nonzero(idx)}")
+        return idx
 
 
 def test():
@@ -231,7 +252,7 @@ def test():
     ax = fig.add_subplot(111)
 
     # Some data.
-    data = np.random.normal(size=(2, 100))
+    data = np.random.normal(size=(2, 10000))
     ax.scatter(*data)
     _ = LassoTool(fig, EventHandler({ax: data}))
     plt.show()
