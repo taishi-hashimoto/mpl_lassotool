@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from logging import getLogger
-from shapely.geometry import Polygon, MultiPoint
+from shapely.geometry import Polygon, Point
 from typing import Callable, Dict, Iterable, Tuple
 
 
@@ -83,8 +83,7 @@ class LassoTool:
             `True` indicate that the point (x, y) is within the lasso polygon.
         """
         polygon = self.polygon
-        points = MultiPoint(list(zip(x, y)))
-        return np.array([polygon.contains(p) for p in points.geoms])
+        return np.array([polygon.contains(Point(p)) for p in zip(x, y)])
 
     def update(self):
         "Redraw the figure."
