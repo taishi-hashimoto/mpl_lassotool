@@ -207,7 +207,8 @@ class EventHandler:
         """Called when lasso tool is closed.
 
         Returned:
-            An boolean array indicating the chosen indices."""
+            An boolean array indicating the chosen indices.
+        """
         idx = lt.contains(*self._xy[lt.ax])
         for ax in self._markers:
             x, y = self._xy[ax]
