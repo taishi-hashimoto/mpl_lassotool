@@ -1,7 +1,7 @@
 "Compute mean of selected X and Y coordinates."
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_lassotool import LassoTool, EventHandler
-import numpy as np
 
 
 class CustomEventHandler(EventHandler):
@@ -21,5 +21,5 @@ fig, ax = plt.subplots()
 data = np.random.normal(size=(2, 10000))
 ax.scatter(*data)
 
-_ = LassoTool(fig, CustomEventHandler())
+_ = LassoTool(fig, CustomEventHandler(marker="x", color="r"))
 plt.show()
