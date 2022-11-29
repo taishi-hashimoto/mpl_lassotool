@@ -49,14 +49,11 @@ class EventHandler:
             if artist in [lt._line, *list(self._markers.values())]:
                 continue  # Known artists that are created by LassoTool.
             else:
-                if isinstance(artist, PathCollection):  # scatter
-                    x, y = artist.get_offsets().T
-                elif isinstance(artist, Line2D):  # plot
-                    x, y = artist.get_data(orig=True)
-                else:
-                    getLogger(lt.NAME).debug(
-                        f"Artist {artist} is not supported, skipping.")
-                    continue  # Otherwise it is not supported.
+                try:
+                    x, y = self.get_xy_from_artist(artist)
+                except NotImplementedError as e:
+                    getLogger(lt.NAME).debug(str(e))
+                    continue
                 idx = lt.contains(x, y)
                 if any(idx):
                     getLogger(lt.NAME).info(np.nonzero(idx)[0])
@@ -67,6 +64,14 @@ class EventHandler:
             self._markers[lt.ax].set_visible(True)
             lt.update()
         return picked
+
+    def get_xy_from_artist(self, artist):
+        if isinstance(artist, PathCollection):  # scatter
+            return artist.get_offsets().T
+        elif isinstance(artist, Line2D):  # plot
+            return artist.get_data(orig=True)
+        else:  # Otherwise it is not supported.
+            raise NotImplementedError(f"Artist {artist} is not supported")
 
 
 class XYEventHandler(EventHandler):
